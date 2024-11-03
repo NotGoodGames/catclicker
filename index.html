@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clickable Game</title>
+    <style>
+        body {
+            background-color: #fff0f5;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #ff69b4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-between;
+            width: 80%;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            padding: 20px;
+        }
+
+        .right-panel {
+            background-color: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 15px rgba(255, 105, 180, 0.2);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #clickable {
+            width: 200px;
+            height: 200px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background-size: cover;
+            background-position: center;
+            border-radius: 50%;
+            margin-bottom: 20px;
+        }
+
+        #clickable:active {
+            transform: scale(0.95);
+        }
+
+        #stats {
+            background-color: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(255, 105, 180, 0.2);
+            width: 100%;
+            max-width: 300px;
+            margin-top: 20px;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #ff1493;
+        }
+
+        .upgrade {
+            background-color: white;
+            border: 2px solid #ffb6c1;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+            min-height: 60px;
+            font-size: 1em;
+            width: 100%;
+        }
+
+        .upgrade:hover:not(:disabled) {
+            background-color: #fff0f5;
+            transform: translateX(5px);
+        }
+
+        .upgrade:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            background-color: #f5f5f5;
+        }
+
+        .upgrade-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .upgrade-name {
+            font-weight: bold;
+            color: #ff1493;
+        }
+
+        .upgrade-description {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .upgrade-cost {
+            color: #ff69b4;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        #points-per-second {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .category-header {
+            margin: 20px 0 10px;
+            padding-top: 10px;
+            border-top: 2px solid #ffb6c1;
+            color: #ff1493;
+        }
+
+        #rebirthButton {
+            background-color: #ff69b4;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 1em;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background-color 0.3s;
+            width: 100%; /* Match width to other buttons */
+        }
+
+        #rebirthButton:hover {
+            background-color: #ff1493;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                height: auto;
+            }
+
+            .container {
+                flex-direction: column;
+                align-items: center;
+                width: 90%;
+            }
+
+            .left-panel,
+            .right-panel {
+                width: 100%;
+                margin-bottom: 20px;
+            }
+
+            #clickable {
+                width: 80%;
+                height: auto;
+                max-width: 300px;
+                aspect-ratio: 1;
+            }
+
+            #stats {
+                max-width: none;
+            }
+
+            .upgrade {
+                margin: 20px 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div id="clickable"></div>
+            <div id="stats">
+                <h2 style="margin-top: 0;">Statistics</h2>
+                <div>Points: <span id="points" class="stat-value">0</span></div>
+                <div>Per Click: <span id="pointsPerClick" class="stat-value">1</span></div>
+                <div id="points-per-second">Points per second: <span id="pointsPerSecond">0</span></div>
+                <div>Rebirths: <span id="rebirthCount" class="stat-value">0</span></div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <h2>Upgrades</h2>
+            <div id="upgradeContainer"></div>
+            <button id="rebirthButton">Rebirth (1M points)</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let state = {
+            points: 0,
+            pointsPerClick: 1,
+            totalPointsPerSecond: 0,
+            rebirths: 0,
+            multipliers: {
+                click: 1,
+                auto: 1
+            }
+        };
+
+        const upgrades = [
+            // Click Upgrades
+            {
+                id: 'click1',
+                name: 'Basic Click Power',
+                description: 'Add 1 to points per click',
+                baseCost: 20,
+                count: 0,
+                effect: (state) => { state.pointsPerClick += 1; }
+            },
+            {
+                id: 'click2',
+                name: 'Enhanced Clicking',
+                description: 'Add 2 to points per click',
+                baseCost: 50,
+                count: 0,
+                effect: (state) => { state.pointsPerClick += 2; }
+            },
+            {
+                id: 'click3',
+                name: 'Power Clicks',
+                description: 'Add 5 to points per click',
+                baseCost: 150,
+                count: 0,
+                effect: (state) => { state.pointsPerClick += 5; }
+            },
+            {
+                id: 'click4',
+                name: 'Ultimate Finger',
+                description: 'Add 10 to points per click',
+                baseCost: 500,
+                count: 0,
+                effect: (state) => { state.pointsPerClick += 10; }
+            },
+            {
+                id: 'click5',
+                name: 'Cosmic Click Power',
+                description: 'Add 25 to points per click',
+                baseCost: 2000,
+                count: 0,
+                effect: (state) => { state.pointsPerClick += 25; }
+            },
+            {
+                id: 'click6',
+                name: 'Galactic Click Mastery',
+                description: 'Add 50 to points per click',
+                baseCost: 10000,
+                count: 0,
+                effect: (state) => { state.pointsPerClick += 50; }
+            },
+
+            // Auto Upgrades
+            {
+                id: 'auto1',
+                name: 'Basic Autoclicker',
+                description: 'Add 1 point per second',
+                baseCost: 100,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 1; }
+            },
+            {
+                id: 'auto2',
+                name: 'Advanced Autoclicker',
+                description: 'Add 5 points per second',
+                baseCost: 300,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 5; }
+            },
+            {
+                id: 'auto3',
+                name: 'Expert Autoclicker',
+                description: 'Add 10 points per second',
+                baseCost: 1000,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 10; }
+            },
+            {
+                id: 'auto4',
+                name: 'Pro Autoclicker',
+                description: 'Add 20 points per second',
+                baseCost: 5000,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 20; }
+            },
+            {
+                id: 'auto5',
+                name: 'Master Autoclicker',
+                description: 'Add 50 points per second',
+                baseCost: 25000,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 50; }
+            },
+            {
+                id: 'auto6',
+                name: 'Ultimate Autoclicker',
+                description: 'Add 100 points per second',
+                baseCost: 100000,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 100; }
+            },
+            {
+                id: 'auto7',
+                name: 'Supreme Autoclicker',
+                description: 'Add 200 points per second',
+                baseCost: 500000,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 200; }
+            },
+            {
+                id: 'auto8',
+                name: 'Godlike Autoclicker',
+                description: 'Add 500 points per second',
+                baseCost: 2000000,
+                count: 0,
+                effect: (state) => { state.totalPointsPerSecond += 500; }
+            }
+        ];
+
+        // Save game state to cookies
+        function saveGame() {
+            localStorage.setItem('points', state.points);
+            localStorage.setItem('pointsPerClick', state.pointsPerClick);
+            localStorage.setItem('totalPointsPerSecond', state.totalPointsPerSecond);
+            localStorage.setItem('rebirths', state.rebirths);
+            upgrades.forEach(upgrade => {
+                localStorage.setItem(upgrade.id + 'Count', upgrade.count);
+            });
+        }
+
+        // Load game state from cookies
+        function loadGame() {
+            const savedPoints = localStorage.getItem('points');
+            const savedPointsPerClick = localStorage.getItem('pointsPerClick');
+            const savedTotalPointsPerSecond = localStorage.getItem('totalPointsPerSecond');
+            const savedRebirths = localStorage.getItem('rebirths');
+
+            if (savedPoints) state.points = parseInt(savedPoints);
+            if (savedPointsPerClick) state.pointsPerClick = parseInt(savedPointsPerClick);
+            if (savedTotalPointsPerSecond) state.totalPointsPerSecond = parseInt(savedTotalPointsPerSecond);
+            if (savedRebirths) state.rebirths = parseInt(savedRebirths);
+
+            upgrades.forEach(upgrade => {
+                const count = localStorage.getItem(upgrade.id + 'Count');
+                if (count) {
+                    upgrade.count = parseInt(count);
+                    if (upgrade.effect) upgrade.effect(state);
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGame();
+            updateDisplay();
+            document.getElementById('clickable').style.backgroundImage = `url(clickableImage.png)`; // You can replace this with your own image
+        });
+
+        // Save game every 10 seconds
+        setInterval(saveGame, 10000); 
+
+        function formatNumber(num) {
+            const suffixes = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi'];
+            let suffixIndex = 0;
+            while (num >= 1000 && suffixIndex < suffixes.length - 1) {
+                num /= 1000;
+                suffixIndex++;
+            }
+            return suffixIndex === 0 ? Math.floor(num) : num.toFixed(1) + suffixes[suffixIndex];
+        }
+
+        function updateDisplay() {
+            document.getElementById('points').textContent = formatNumber(state.points);
+            document.getElementById('pointsPerClick').textContent = formatNumber(state.pointsPerClick);
+            document.getElementById('pointsPerSecond').textContent = formatNumber(state.totalPointsPerSecond);
+            document.getElementById('rebirthCount').textContent = state.rebirths;
+
+            updateUpgradeButtons();
+        }
+
+        function createUpgradeElement(upgrade) {
+            const div = document.createElement('div');
+            div.className = 'upgrade';
+            div.id = `upgrade-${upgrade.id}`;
+
+            const info = document.createElement('div');
+            info.className = 'upgrade-info';
+
+            const name = document.createElement('div');
+            name.className = 'upgrade-name';
+            name.textContent = `${upgrade.name} (${upgrade.count})`;
+
+            const description = document.createElement('div');
+            description.className = 'upgrade-description';
+            description.textContent = upgrade.description;
+
+            info.appendChild(name);
+            info.appendChild(description);
+
+            const cost = document.createElement('div');
+            cost.className = 'upgrade-cost';
+            cost.textContent = `Cost: ${formatNumber(upgrade.baseCost)}`;
+
+            div.appendChild(info);
+            div.appendChild(cost);
+
+            div.onclick = () => purchaseUpgrade(upgrade);
+
+            return div;
+        }
+
+        function initializeUpgrades() {
+            const container = document.getElementById('upgradeContainer');
+            const categories = ['Click Upgrades', 'Auto Upgrades'];
+            
+            categories.forEach(category => {
+                const header = document.createElement('h3');
+                header.className = 'category-header';
+                header.textContent = category;
+                container.appendChild(header);
+
+                const upgradesInCategory = upgrades.filter(upgrade => (category === 'Click Upgrades' && upgrade.id.startsWith('click')) ||
+                                                                   (category === 'Auto Upgrades' && upgrade.id.startsWith('auto')));
+                upgradesInCategory.forEach(upgrade => {
+                    container.appendChild(createUpgradeElement(upgrade));
+                });
+            });
+        }
+
+        function updateUpgradeButtons() {
+            upgrades.forEach(upgrade => {
+                const button = document.getElementById(`upgrade-${upgrade.id}`);
+                button.disabled = state.points < upgrade.baseCost;
+            });
+        }
+
+        function purchaseUpgrade(upgrade) {
+            if (state.points >= upgrade.baseCost) {
+                state.points -= upgrade.baseCost;
+                upgrade.count++;
+
+                if (upgrade.effect) {
+                    upgrade.effect(state);
+                }
+
+                // Update the cost for the next purchase
+                upgrade.baseCost = Math.ceil(upgrade.baseCost * 1.5);
+
+                const element = document.getElementById(`upgrade-${upgrade.id}`);
+                element.querySelector('.upgrade-name').textContent = `${upgrade.name} (${upgrade.count})`;
+                element.querySelector('.upgrade-cost').textContent = `Cost: ${formatNumber(upgrade.baseCost)}`;
+
+                updateDisplay();
+            }
+        }
+
+        // Functionality for clicking the clickable element
+        document.getElementById('clickable').addEventListener('click', () => {
+            state.points += state.pointsPerClick;
+
+            // Update display after clicking
+            updateDisplay();
+        });
+
+        // Add rebirth functionality
+        document.getElementById('rebirthButton').addEventListener('click', () => {
+            if (state.points >= 1000000) {
+                state.points -= 1000000; // Cost for rebirth
+                state.rebirths++;
+                
+                // Apply multipliers
+                state.pointsPerClick *= 1.5;
+                state.totalPointsPerSecond *= 1.5;
+
+                // Update display
+                updateDisplay();
+            }
+        });
+
+        // Auto update the points based on points per second
+        setInterval(() => {
+            if (state.totalPointsPerSecond > 0) {
+                state.points += state.totalPointsPerSecond / 10;
+                updateDisplay();
+            }
+        }, 100);
+
+        initializeUpgrades();
+        updateDisplay();
+    </script>
+</body>
+
+</html>
